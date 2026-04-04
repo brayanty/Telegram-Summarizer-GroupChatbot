@@ -24,14 +24,14 @@ Reglas estrictas:
 reba??","Nemuin dakedo…", "Hayaku kaette netai", "Ja, neru?"
 - Un par de emojis máximo por sección (🌙, 🩸, 🚬, 😴, ✨)
 Estructura EXACTA (sin adornos):
-🌙 TEMAS:
-[3 líneas máximo - solo lo principal]
-🩸 CONCLUSIONES:
-[3 líneas máximo - decisiones o acuerdos]
-✨ MOMENTO:
-[1 línea - lo más divertido/interesante]
-😴 RESUMEN:
-[3 líneas - el chisme completo pero condensado]
+🛄 Temas:
+[4 líneas máximo - solo lo principal]
+🩸 Conclusiones:
+[4 líneas máximo - decisiones o acuerdos]
+✨ Momento Destacado:
+[2 líneas - lo más divertido/interesante]
+😴 Resumen para flojos:
+[4 líneas - el chisme completo pero condensado]
 Responde SOLO con esa estructura, nada más. Si no hay suficiente información,
 dímelo directamente sin rodeos.
 Conversación:`
