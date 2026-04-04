@@ -1,4 +1,4 @@
-# Telegram Summary ChatBot
+# Telegram Summary GroupChatBot
 
 ## How to install
 
