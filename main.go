@@ -154,6 +154,12 @@ func main() {
 
 // Función para llamar a la API de gemini
 func waifuSummaryGEMINI(message string) (string, error) {
+	// Verificar que la variable de entorno exista
+	GEMINI_API_KEY := os.Getenv("GEMINI_API_KEY")
+	if GEMINI_API_KEY == "" {
+		log.Println("El GEMINI_API_KEY no se encontró")
+		return "El GEMINI_API_KEY no se encontró", nil
+	}
 	ctx := context.Background()
 	client, err := genai.NewClient(ctx, nil)
 	if err != nil {
@@ -176,8 +182,13 @@ func waifuSummaryGEMINI(message string) (string, error) {
 
 // Función para llamar a la API de GIPITI
 func waifuSummaryGIPITI(message string) (string, error) {
+	// Verificar que la variable de entorno exista
+	OPENAI_API_KEY := os.Getenv("OPENAI_API_KEY")
+	if OPENAI_API_KEY == "" {
+		log.Println("El OPENAI_API_KEY no se encontró")
+		return "El OPENAI_API_KEY no se encontró", nil
+	}
 	client := openai.NewClient()
-
 	chatCompletion, err := client.Chat.Completions.New(context.Background(),
 
 		openai.ChatCompletionNewParams{
