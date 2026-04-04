@@ -125,9 +125,26 @@ func main() {
 				"¡El bot guarda automáticamente los últimos 300 mensajes del grupo!\n" +
 				"Nyaa~🎀"
 
-			msg.Text = helpText
-			msg.ParseMode = "Markdown"
-			bot.Send(msg)
+			media := []interface{}{
+				tgbotapi.NewInputMediaPhoto(
+					tgbotapi.FileURL("https://i.pinimg.com/736x/5b/49/91/5b499161daba947d434f1b8cd41530fd.jpg"),
+				),
+			}
+			photo := media[0].(tgbotapi.InputMediaPhoto)
+			photo.Caption = helpText
+			photo.ParseMode = "Markdown"
+			media[0] = photo
+			mediaGroup := tgbotapi.NewMediaGroup(update.Message.Chat.ID, media)
+
+			_, err := bot.SendMediaGroup(mediaGroup)
+			if err != nil {
+				log.Printf("Error al enviar el mensaje con foto: %v", err)
+
+				// Opcional: si falla el media group, envía solo el texto como respaldo
+				msg := tgbotapi.NewMessage(update.Message.Chat.ID, helpText)
+				msg.ParseMode = "Markdown"
+				bot.Send(msg)
+			}
 
 		case "getStats":
 			if messageBuffer.GetStats() == "" {
