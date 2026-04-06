@@ -9,6 +9,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"sync"
 	"time"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
@@ -18,8 +19,6 @@ import (
 )
 
 func main() {
-	// Crear el buffer de mensajes con capacidad para 300 mensajes
-	messageBuffer := NewChatBuffer(300)
 	// Cargar variables de entorno desde el archivo .env
 	if err := godotenv.Load(); err != nil {
 		log.Println("No se encontró el archivo .env")
@@ -27,6 +26,7 @@ func main() {
 	} else {
 		log.Println("Archivo .env cargado")
 	}
+
 	// Variables de entorno
 	botToken := os.Getenv("TELEGRAM_BOT_TOKEN")
 	debugMode := os.Getenv("GO_ENV") == "development"
@@ -50,6 +50,10 @@ func main() {
 
 	updates := bot.GetUpdatesChan(u)
 
+	// Crear buffers separados para cada chat (grupo)
+	chatBuffers := make(map[int64]*ChatBuffer)
+	var buffersMu sync.Mutex
+
 	// Bucle principal del bot para responder
 	for update := range updates {
 
@@ -57,13 +61,29 @@ func main() {
 			continue
 		}
 
+		chatID := update.Message.Chat.ID
+		userName := update.Message.From.UserName
+		if userName == "" {
+			userName = update.Message.From.FirstName
+		}
+
+		// Obtener o crear el buffer para este chat
+		buffersMu.Lock()
+		bufferMenssage, exists := chatBuffers[chatID]
+		if !exists {
+			// Guardar los últimos 100 mensajes por grupo
+			bufferMenssage = NewChatBuffer(100)
+			chatBuffers[chatID] = bufferMenssage
+		}
+		buffersMu.Unlock()
+
 		msg := tgbotapi.NewMessage(update.Message.Chat.ID, "")
 
 		// Agregar mensajes e ignorar el comando /summary
 		if update.Message.Text != "/summary" {
 			userName := update.Message.From.FirstName
 			message := update.Message.Text
-			messageBuffer.Add(userName, message)
+			bufferMenssage.Add(userName, message)
 		}
 
 		command := update.Message.Command()
@@ -74,35 +94,37 @@ func main() {
 		// Manejar comandos
 		switch command {
 		case "summary":
-			update.Message.Text =
-				messageBuffer.GetFormattedMessages()
+			text := bufferMenssage.GetFormattedMessages()
 
-			if update.Message.Text == "" {
+			if text == "" {
 				msg.Text = "Eh no hay mensajes que resumir..."
 				bot.Send(msg)
 				continue
 			}
 
-			// Primero intento con GEMINI, si falla intento con GROP
-			summary, _ := waifuSummaryGEMINI(update.Message.Text, prompt)
+			// Intento con GEMINI
+			summary, err := waifuSummaryGEMINI(text, prompt)
+			if err != nil {
+				log.Printf("Error con GEMINI: %v", err)
+			}
+
+			// Si falla o viene vacío, intento con GROP
 			if summary == "" {
-				// Si falla GEMINI, intento con GROP
-				summary, _ = gropIA(update.Message.Text, prompt)
+				summary, err = gropIA(text, prompt)
+				if err != nil {
+					log.Printf("Error con GROP: %v", err)
+				}
+
 				if summary == "" {
-					log.Printf("Error con GROP no GROK de X: %v", err)
 					msg.Text = "Eh, no quiero resumir nada largate. **Se duerme**."
 					bot.Send(msg)
 					continue
 				}
-
-				msg.Text = summary
-			} else {
-				msg.Text = summary
 			}
 
+			msg.Text = summary
 			msg.ParseMode = ""
 			bot.Send(msg)
-
 		case "help":
 			media := []interface{}{
 				tgbotapi.NewInputMediaPhoto(
@@ -126,23 +148,47 @@ func main() {
 			}
 
 		case "getStats":
-			if messageBuffer.GetStats() == "" {
+			if bufferMenssage.GetStats() == "" {
 				msg.Text = "No hay nada para ver aquí... Fuun, tsumannai..."
 			}
-			msg.Text = messageBuffer.GetStats()
+			msg.Text = bufferMenssage.GetStats()
 			msg.ParseMode = ""
 			bot.Send(msg)
 		case "clear":
-			messageBuffer.Clear()
+			bufferMenssage.Clear()
 			msg.Text = `Ya me auto formateé la cabeza, ahora a mimir... **Se duerme**`
 			bot.Send(msg)
 		case "ask":
-			answer, _ := waifuSummaryGEMINI(update.Message.From.FirstName+update.Message.Text, promptToAsk)
+			input := update.Message.From.FirstName + ": " + update.Message.Text
+
+			// Intento con GEMINI
+			answer, err := waifuSummaryGEMINI(input, promptToAsk)
+			if err != nil {
+				log.Printf("Error con GEMINI: %v", err)
+			}
+
+			// Intento a GROP
 			if answer == "" {
-				answer, _ := gropIA(update.Message.From.FirstName+update.Message.Text, promptToAsk)
+				answer, err = gropIA(input, promptToAsk)
+				if err != nil {
+					log.Printf("Error con GROP: %v", err)
+				}
+
+				if answer == "" {
+					msg.Text = "No hay nada para ver aquí... Fuun, tsumannai..."
+
+					bot.Send(msg)
+					continue
+				}
+			}
+
+			username := update.Message.From.UserName
+			if username != "" {
+				msg.Text = "@" + username + " " + answer
+			} else {
 				msg.Text = answer
 			}
-			msg.Text = "@" + update.Message.From.UserName + " " + answer
+
 			msg.ParseMode = ""
 			bot.Send(msg)
 		default:
